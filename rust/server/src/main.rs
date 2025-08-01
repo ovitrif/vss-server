@@ -18,9 +18,11 @@ use hyper::server::conn::http1;
 use hyper_util::rt::TokioIo;
 
 use crate::vss_service::VssService;
-use api::auth::{Authorizer, NoopAuthorizer};
+use api::auth::Authorizer;
 use api::kv_store::KvStore;
+use auth_impls::JWTAuthorizer;
 use impls::postgres_store::PostgresBackendImpl;
+use jsonwebtoken::DecodingKey;
 use std::sync::Arc;
 
 pub(crate) mod util;
@@ -42,7 +44,7 @@ fn main() {
 	};
 
 	let addr: SocketAddr =
-		match format!("{}:{}", config.server_config.host, config.server_config.port).parse() {
+		match format!("{}:{}", config.server_config.get_host(), config.server_config.get_port()).parse() {
 			Ok(addr) => addr,
 			Err(e) => {
 				eprintln!("Invalid host/port configuration: {}", e);
@@ -66,7 +68,21 @@ fn main() {
 				std::process::exit(-1);
 			},
 		};
-		let authorizer = Arc::new(NoopAuthorizer {});
+		let public_key_pem = match std::env::var("VSS_JWT_PUBLIC_KEY") {
+			Ok(key) => key,
+			Err(_) => {
+				eprintln!("Failed to get JWT public key from environment variable");
+				std::process::exit(1);
+			}
+		};
+		let decoding_key = match DecodingKey::from_rsa_pem(public_key_pem.as_bytes()) {
+			Ok(key) => key,
+			Err(e) => {
+				eprintln!("Failed to parse RSA public key: {}", e);
+				std::process::exit(1);
+			}
+		};
+		let authorizer = Arc::new(JWTAuthorizer::new(decoding_key).await);
 		let store = Arc::new(
 			PostgresBackendImpl::new(&config.postgresql_config.expect("PostgreSQLConfig must be defined in config file.").to_connection_string())
 				.await
@@ -74,6 +90,7 @@ fn main() {
 		);
 		let rest_svc_listener =
 			TcpListener::bind(&addr).await.expect("Failed to bind listening port");
+		println!("VSS server listening on {}", addr);
 		loop {
 			tokio::select! {
 				res = rest_svc_listener.accept() => {
