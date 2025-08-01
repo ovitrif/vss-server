@@ -52,20 +52,31 @@ impl Authorizer for JWTAuthorizer {
 	async fn verify(
 		&self, headers_map: &HashMap<String, String>,
 	) -> Result<AuthResponse, VssError> {
+		println!("Headers: {:?}", headers_map);
+
 		let auth_header = headers_map
-			.get("Authorization")
-			.ok_or(VssError::AuthError("Authorization header not found.".to_string()))?;
+			.get("authorization")
+			.ok_or_else(|| {
+				println!("Authorization header not found.");
+				VssError::AuthError("Authorization header not found.".to_string())
+			})?;
 
 		let token = auth_header
 			.strip_prefix(BEARER_PREFIX)
 			.ok_or(VssError::AuthError("Invalid token format.".to_string()))?;
 
-		let claims =
-			decode::<Claims>(token, &self.jwt_issuer_key, &Validation::new(Algorithm::RS256))
-				.map_err(|e| VssError::AuthError(format!("Authentication failure. {}", e)))?
-				.claims;
+		let validation = Validation::new(Algorithm::RS256);
 
-		Ok(AuthResponse { user_token: claims.sub })
+		match decode::<Claims>(token, &self.jwt_issuer_key, &validation) {
+			Ok(decoded) => {
+				println!("Token decoded successfully.");
+				Ok(AuthResponse { user_token: decoded.claims.sub })
+			},
+			Err(e) => {
+				println!("Error decoding: {}", e);
+				Err(VssError::AuthError(format!("Authentication failure. {}", e)))
+			}
+		}
 	}
 }
 
