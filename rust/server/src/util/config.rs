@@ -8,17 +8,34 @@ pub(crate) struct Config {
 
 #[derive(Deserialize)]
 pub(crate) struct ServerConfig {
-	pub(crate) host: String,
-	pub(crate) port: u16,
+	pub(crate) host: Option<String>,  // Optional in TOML, can be overridden by env
+	pub(crate) port: Option<u16>,     // Optional in TOML, can be overridden by env
+}
+
+impl ServerConfig {
+	pub(crate) fn get_host(&self) -> String {
+		std::env::var("VSS_SERVER_HOST")
+			.ok()
+			.or_else(|| self.host.clone())
+			.expect("Server host must be provided in config or env var VSS_SERVER_HOST must be set.")
+	}
+
+	pub(crate) fn get_port(&self) -> u16 {
+		std::env::var("VSS_SERVER_PORT")
+			.ok()
+			.and_then(|p| p.parse().ok())
+			.or(self.port)
+			.expect("Server port must be provided in config or env var VSS_SERVER_PORT must be set.")
+	}
 }
 
 #[derive(Deserialize)]
 pub(crate) struct PostgreSQLConfig {
 	pub(crate) username: Option<String>, // Optional in TOML, can be overridden by env
 	pub(crate) password: Option<String>, // Optional in TOML, can be overridden by env
-	pub(crate) host: String,
-	pub(crate) port: u16,
-	pub(crate) database: String,
+	pub(crate) host: Option<String>,     // Optional in TOML, can be overridden by env
+	pub(crate) port: Option<u16>,        // Optional in TOML, can be overridden by env
+	pub(crate) database: Option<String>,  // Optional in TOML, can be overridden by env
 }
 
 impl PostgreSQLConfig {
@@ -33,10 +50,23 @@ impl PostgreSQLConfig {
 			.ok()
 			.or_else(|| self.password.as_ref())
 			.expect("PostgreSQL database password must be provided in config or env var VSS_POSTGRESQL_PASSWORD must be set.");
+		let host = std::env::var("VSS_POSTGRESQL_HOST")
+			.ok()
+			.or_else(|| self.host.clone())
+			.expect("PostgreSQL database host must be provided in config or env var VSS_POSTGRESQL_HOST must be set.");
+		let port = std::env::var("VSS_POSTGRESQL_PORT")
+			.ok()
+			.and_then(|p| p.parse().ok())
+			.or(self.port)
+			.expect("PostgreSQL database port must be provided in config or env var VSS_POSTGRESQL_PORT must be set.");
+		let database = std::env::var("VSS_POSTGRESQL_DATABASE")
+			.ok()
+			.or_else(|| self.database.clone())
+			.expect("PostgreSQL database name must be provided in config or env var VSS_POSTGRESQL_DATABASE must be set.");
 
 		format!(
 			"postgresql://{}:{}@{}:{}/{}",
-			username, password, self.host, self.port, self.database
+			username, password, host, port, database
 		)
 	}
 }
