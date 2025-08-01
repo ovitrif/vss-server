@@ -44,6 +44,7 @@ impl Service<Request<Incoming>> for VssService {
 
 		Box::pin(async move {
 			let prefix_stripped_path = path.strip_prefix(BASE_PATH_PREFIX).unwrap_or_default();
+			println!("VSS request: {} {}", req.method(), path);
 
 			match prefix_stripped_path {
 				"/getObject" => {
@@ -129,29 +130,45 @@ async fn handle_request<
 }
 
 fn build_error_response(e: VssError) -> Response<Full<Bytes>> {
-	let error_response = match e {
-		VssError::NoSuchKeyError(msg) => ErrorResponse {
-			error_code: ErrorCode::NoSuchKeyException.into(),
-			message: msg.to_string(),
-		},
-		VssError::ConflictError(msg) => ErrorResponse {
-			error_code: ErrorCode::ConflictException.into(),
-			message: msg.to_string(),
-		},
-		VssError::InvalidRequestError(msg) => ErrorResponse {
-			error_code: ErrorCode::InvalidRequestException.into(),
-			message: msg.to_string(),
-		},
-		VssError::AuthError(msg) => {
-			ErrorResponse { error_code: ErrorCode::AuthException.into(), message: msg.to_string() }
-		},
-		_ => ErrorResponse {
-			error_code: ErrorCode::InternalServerException.into(),
-			message: "Unknown Server Error occurred.".to_string(),
-		},
+	let (error_response, status_code) = match e {
+		VssError::NoSuchKeyError(msg) => (
+			ErrorResponse {
+				error_code: ErrorCode::NoSuchKeyException.into(),
+				message: msg.to_string(),
+			},
+			StatusCode::NOT_FOUND,
+		),
+		VssError::ConflictError(msg) => (
+			ErrorResponse {
+				error_code: ErrorCode::ConflictException.into(),
+				message: msg.to_string(),
+			},
+			StatusCode::CONFLICT,
+		),
+		VssError::InvalidRequestError(msg) => (
+			ErrorResponse {
+				error_code: ErrorCode::InvalidRequestException.into(),
+				message: msg.to_string(),
+			},
+			StatusCode::BAD_REQUEST,
+		),
+		VssError::AuthError(msg) => (
+			ErrorResponse { 
+				error_code: ErrorCode::AuthException.into(), 
+				message: msg.to_string() 
+			},
+			StatusCode::UNAUTHORIZED,
+		),
+		_ => (
+			ErrorResponse {
+				error_code: ErrorCode::InternalServerException.into(),
+				message: "Unknown Server Error occurred.".to_string(),
+			},
+			StatusCode::INTERNAL_SERVER_ERROR,
+		),
 	};
 	Response::builder()
-		.status(StatusCode::INTERNAL_SERVER_ERROR)
+		.status(status_code)
 		.body(Full::new(Bytes::from(error_response.encode_to_vec())))
 		// unwrap safety: body only errors when previous chained calls failed.
 		.unwrap()
