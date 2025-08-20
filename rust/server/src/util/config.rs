@@ -10,6 +10,7 @@ pub(crate) struct Config {
 pub(crate) struct ServerConfig {
 	pub(crate) host: Option<String>,  // Optional in TOML, can be overridden by env
 	pub(crate) port: Option<u16>,     // Optional in TOML, can be overridden by env
+	pub(crate) jwt_public_key: Option<String>, // Optional in TOML, can be overridden by env
 }
 
 impl ServerConfig {
@@ -26,6 +27,13 @@ impl ServerConfig {
 			.and_then(|p| p.parse().ok())
 			.or(self.port)
 			.expect("Server port must be provided in config or env var VSS_SERVER_PORT must be set.")
+	}
+
+	pub(crate) fn get_jwt_public_key(&self) -> String {
+		std::env::var("VSS_JWT_PUBLIC_KEY")
+			.ok()
+			.or_else(|| self.jwt_public_key.clone())
+			.expect("JWT public key must be provided in config or env var VSS_JWT_PUBLIC_KEY must be set.")
 	}
 }
 

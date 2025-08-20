@@ -68,13 +68,7 @@ fn main() {
 				std::process::exit(-1);
 			},
 		};
-		let public_key_pem = match std::env::var("VSS_JWT_PUBLIC_KEY") {
-			Ok(key) => key,
-			Err(_) => {
-				eprintln!("Failed to get JWT public key from environment variable");
-				std::process::exit(1);
-			}
-		};
+		let public_key_pem = config.server_config.get_jwt_public_key();
 		let decoding_key = match DecodingKey::from_rsa_pem(public_key_pem.as_bytes()) {
 			Ok(key) => key,
 			Err(e) => {
