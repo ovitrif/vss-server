@@ -52,10 +52,22 @@ impl Authorizer for JWTAuthorizer {
 	async fn verify(
 		&self, headers_map: &HashMap<String, String>,
 	) -> Result<AuthResponse, VssError> {
-		println!("Headers: {:?}", headers_map);
+		let headers_log: HashMap<String, String> = headers_map
+			.iter()
+			.map(|(k, v)| {
+				if k.to_lowercase() == "authorization" && v.starts_with("Bearer ") {
+					let token_len = v.len() - 7;
+					(k.clone(), format!("Bearer <{} chars>", token_len))
+				} else {
+					(k.clone(), v.clone())
+				}
+			})
+			.collect();
+		println!("Headers: {:?}", headers_log);
 
 		let auth_header = headers_map
 			.get("authorization")
+			.or_else(|| headers_map.get("Authorization"))
 			.ok_or_else(|| {
 				println!("Authorization header not found.");
 				VssError::AuthError("Authorization header not found.".to_string())
@@ -163,7 +175,7 @@ mod tests {
 			encode(&Header::new(Algorithm::RS256), &claims, &valid_encoding_key).unwrap();
 		let mut headers_map: HashMap<String, String> = HashMap::new();
 		let header_value = format!("Bearer {}", valid_jwt_token);
-		headers_map.insert("Authorization".to_string(), header_value.clone());
+		headers_map.insert("authorization".to_string(), header_value.clone());
 		println!("headers_map: {:?}", headers_map);
 
 		// JWT signed by valid key results in authenticated user.
@@ -204,7 +216,7 @@ mod tests {
 
 		let invalid_jwt_token =
 			encode(&Header::new(Algorithm::RS256), &claims, &invalid_encoding_key).unwrap();
-		headers_map.insert("Authorization".to_string(), format!("Bearer {}", invalid_jwt_token));
+		headers_map.insert("authorization".to_string(), format!("Bearer {}", invalid_jwt_token));
 
 		// JWT signed by invalid key results in AuthError.
 		assert!(matches!(
