@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> This repository has moved to [synonymdev/vss-server](https://github.com/synonymdev/vss-server).
+
 # Versioned Storage Service
 
 ### Introduction to VSS (Versioned Storage Service)
