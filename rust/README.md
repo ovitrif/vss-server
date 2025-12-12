@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> This repository has moved to [synonymdev/vss-server](https://github.com/synonymdev/vss-server).
+
 # Versioned Storage Service (Rust)
 
 This directory hosts the Rust-based implementation of the Versioned Storage Service (VSS).
